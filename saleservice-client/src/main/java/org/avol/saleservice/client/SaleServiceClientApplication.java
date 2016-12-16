@@ -1,26 +1,31 @@
 package org.avol.saleservice.client;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
-import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
 import org.springframework.cloud.netflix.feign.EnableFeignClients;
 import org.springframework.cloud.netflix.feign.FeignClient;
+import org.springframework.cloud.stream.annotation.EnableBinding;
+import org.springframework.cloud.stream.messaging.Source;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.hateoas.Resources;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 //@EnableZuulProxy
-//@EnableBinding(Source.class)
+@EnableBinding(Source.class)
 @EnableCircuitBreaker
 //@EnableDiscoveryClient
 @EnableEurekaClient
@@ -42,37 +47,49 @@ public class SaleServiceClientApplication {
 interface SaleServiceClient {
 
     @RequestMapping(value = "/sayHello", method = RequestMethod.GET)
-    String sales();
+    String sayHello();
+
+    @RequestMapping(value = "/sales", method = RequestMethod.GET)
+    ResponseEntity<List<Sale>> sales();
 }
 
+
 @RestController
+@RequestMapping(value = "/sale", produces = MediaType.APPLICATION_JSON_VALUE)
 class SaleClientController {
 
     @Autowired
     private SaleServiceClient saleServiceClient;
 
-    /*@Autowired
-    private Source source;*/
+    @Autowired
+    private Source source;
 
-    public Collection<String> getSalesFallback() {
-        return Collections.emptyList();
+    public ResponseEntity<List<Sale>> getSalesFallback() {
+        return ResponseEntity.ok(Collections.emptyList());
     }
 
     ParameterizedTypeReference<Resources<Sale>> saleParameterizedTypeReference =
             new ParameterizedTypeReference<Resources<Sale>>() {
             };
 
-    /*@RequestMapping(method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
     public void save(@RequestBody Sale sale) {
+        System.out.println("SaleClientController.save : " + sale.getProductName());
         Message message = MessageBuilder.withPayload(sale).build();
         source.output().send(message);
-    }*/
+    }
 
-    //@HystrixCommand(fallbackMethod = "getSalesFallback")
-    @RequestMapping("/")
-    public String sayHello() {
-        System.out.println("SaleServiceClientApplication.sales");
+    @HystrixCommand(fallbackMethod = "getSalesFallback")
+    @RequestMapping(method = RequestMethod.GET)
+    public ResponseEntity<List<Sale>> fetchAll() {
+        System.out.println("SaleClientController.fetchAll");
         return saleServiceClient.sales();
+    }
+
+    @RequestMapping("/sayHello")
+    public String sayHello() {
+        System.out.println("SaleClientController.sayHello");
+        return saleServiceClient.sayHello();
     }
 
     /*{
